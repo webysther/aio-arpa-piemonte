@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: If you use aioarpapiemonte, please cite it as below.
+title: "aioarpapiemonte: async Python client for the real-time data of the stations of Arpa Piemonte"
+type: software
+authors:
+  - family-names: Sperandio
+    given-names: Webysther
+repository-code: "https://github.com/webysther/aio-arpa-piemonte"
+url: "https://github.com/webysther/aio-arpa-piemonte"
+license: MIT
+keywords:
+  - Arpa Piemonte
+  - api_realtime
+  - river level
+  - hydrometer
+  - open data
+  - Italy

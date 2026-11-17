@@ -222,7 +222,7 @@ def _sensor(feature: object) -> Sensor:
     )
 
 
-def _param_reading(key: object, cell: object) -> ParamReading | None:
+def _param_reading(key: str, cell: object) -> ParamReading | None:
     """Return a reading of a file; None for a cell without value."""
     if not isinstance(cell, Mapping):
         msg = f"The reading of {key!r} is not an object"
@@ -244,10 +244,7 @@ def _param_reading(key: object, cell: object) -> ParamReading | None:
     )
 
 
-def _utc_time(key: object) -> dt.datetime:
-    if not isinstance(key, str):
-        msg = f"Not a time: {key!r}"
-        raise ArpaPiemonteParseError(msg)
+def _utc_time(key: str) -> dt.datetime:
     try:
         return dt.datetime.strptime(key, GEOJSON_TIME_FORMAT).replace(tzinfo=dt.UTC)
     except ValueError as err:

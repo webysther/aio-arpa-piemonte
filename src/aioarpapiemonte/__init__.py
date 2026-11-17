@@ -10,7 +10,7 @@ The data is by Arpa Piemonte, under CC BY 4.0: credit it with
 """
 
 from .client import ArpaPiemonteClient
-from .const import ATTRIBUTION, DEFAULT_REQUEST_TIMEOUT, PIEMONTE_NETWORK
+from .const import ATTRIBUTION, DEFAULT_REQUEST_TIMEOUT, MAX_PAGES, PIEMONTE_NETWORK
 from .exceptions import (
     ArpaPiemonteConnectionError,
     ArpaPiemonteError,
@@ -38,6 +38,7 @@ from .urls import sensor_id
 __all__ = [
     "ATTRIBUTION",
     "DEFAULT_REQUEST_TIMEOUT",
+    "MAX_PAGES",
     "PIEMONTE_NETWORK",
     "USABLE",
     "ArpaPiemonteClient",
