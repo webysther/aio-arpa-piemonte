@@ -44,6 +44,10 @@ src/aioarpapiemonte/
                  the website; const.py
 tests/           pytest; tests/server.py is a local HTTPS server standing in
                  for the hosts of Arpa, answering 304 to conditional requests
+docs/            arpa-data.md: the station files of the website and the
+                 api_realtime; arpa-risk-products.md: alerts, floods,
+                 landslides, avalanches and the other risk products, not
+                 read by the library yet
 ```
 
 The public API is what `aioarpapiemonte/__init__.py` exports in `__all__`,
@@ -73,6 +77,13 @@ coverage gate is 95% with branches; keep it at 100%.
 - Never depend on the current date or time zone of the machine.
 
 ## Arpa Piemonte data
+
+Read [docs/arpa-data.md](docs/arpa-data.md) and
+[docs/arpa-risk-products.md](docs/arpa-risk-products.md) before researching
+the sources again: every file, API and product of Arpa Piemonte studied on
+2026-11-16 and 17 (URLs, formats, sizes, cadence, codes, licence), the open
+data and national sources around them, and what is still unverified. Add what
+you measure to them, with the date.
 
 Facts that are easy to get wrong (measured on 2026-11-17, see the README):
 
