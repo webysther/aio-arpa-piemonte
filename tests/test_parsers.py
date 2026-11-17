@@ -205,6 +205,9 @@ class TestRealtime:
         assert pray.thresholds == Thresholds(2.3, 3.0, 3.8)
         assert pray.hydrometric_zero == 400.7
         assert pray.river == "SESSERA"
+        rain_gauge = next(s for s in stations if s.station_code == "001")
+        assert rain_gauge.river is None
+        assert sum(station.river is None for station in stations) == 264
 
     def test_station_identifier(self) -> None:
         """Test the identifier on the website, from text or broken values."""

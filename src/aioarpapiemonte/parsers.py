@@ -45,6 +45,11 @@ THRESHOLD_KEYS: Final = (
 )
 """Thresholds in the level files (``idro``), in that order; with a hyphen."""
 
+_EMPTY_TEXTS: Final = frozenset({"", "-"})
+"""Texts written for a missing value: the api_realtime gives the river of the
+264 stations without a hydrometer as "-" (``river_name``, measured on
+2026-11-17), as Meteo 3R does."""
+
 
 def parse_sensors(data: object) -> tuple[Sensor, ...]:
     """Return the stations of the list of the website (``sensors.geojson``).
@@ -331,7 +336,7 @@ def _mapping(value: object, what: str) -> Mapping[str, object]:
 def _text(record: Mapping[str, object], key: str) -> str | None:
     """Return a text of a record, stripped; None when missing or empty."""
     value = record.get(key)
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str) or value.strip() in _EMPTY_TEXTS:
         return None
     return value.strip()
 

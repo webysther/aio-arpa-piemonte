@@ -63,4 +63,4 @@ __all__ = [
     "station_page_url",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
