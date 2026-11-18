@@ -11,7 +11,7 @@ hours later). It also reads the natural risks: the widgets of the website
 the avalanche bulletins of AINEVA through EAWS. It is fully typed, has no Home
 Assistant dependency and is published to PyPI.
 
-Its main user is the Home Assistant integration ARPA Piemonte
+Its main user is the Home Assistant integration Arpa Piemonte
 (`arpa_piemonte`), which pins an exact version and reads these sources when
 [aiometeo3r](https://github.com/webysther/aio-meteo3r) (Meteo 3R, its primary
 source) fails. Parsing and HTTP fixes of these sources belong here; Home

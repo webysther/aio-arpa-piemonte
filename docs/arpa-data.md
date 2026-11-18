@@ -1,7 +1,7 @@
 # Arpa Piemonte data: station files and api_realtime
 
 The station data of Arpa Piemonte that aioarpapiemonte reads, or could read,
-as studied for the [ARPA Piemonte](https://github.com/webysther/ha-arpa-piemonte) integration.
+as studied for the [Arpa Piemonte](https://github.com/webysther/ha-arpa-piemonte) integration.
 Measured on 2026-11-16 and 17. The numbers are measurements of those days:
 measure again, politely, before relying on one. Anything not confirmed is
 marked **Unverified**.

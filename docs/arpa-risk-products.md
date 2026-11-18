@@ -5,7 +5,7 @@ bulletin, the per-municipality widget, current danger, vigilance, flood
 forecasts, landslide scenarios, snow and avalanches, heat waves, fire danger
 and earthquakes, plus the APIs, open data and national sources around them.
 It was studied for the
-[ARPA Piemonte](https://github.com/webysther/ha-arpa-piemonte) integration, to offer what the
+[Arpa Piemonte](https://github.com/webysther/ha-arpa-piemonte) integration, to offer what the
 DPC integration offers, for Piedmont, from the regional source. Since 0.2.0,
 aioarpapiemonte reads the widget of a municipality, the earthquakes, the heat
 waves and the avalanche bulletins of EAWS.
