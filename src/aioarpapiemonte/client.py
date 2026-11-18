@@ -1,4 +1,4 @@
-"""Async client of the real-time data of Arpa Piemonte."""
+"""Async client of the data of Arpa Piemonte: its stations and natural risks."""
 
 from __future__ import annotations
 
@@ -12,22 +12,36 @@ from typing import TYPE_CHECKING, Self
 import aiohttp
 
 from ._http import ConditionalCache
-from .const import DEFAULT_REQUEST_TIMEOUT, MAX_PAGES, REPOSITORY_URL
+from .const import (
+    AVALANCHE_BULLETINS_KEPT,
+    DEFAULT_REQUEST_TIMEOUT,
+    MAX_PAGES,
+    REPOSITORY_URL,
+)
 from .exceptions import (
     ArpaPiemonteConnectionError,
     ArpaPiemonteNotFoundError,
     ArpaPiemonteParseError,
 )
-from .models import Param, RealtimeData, RealtimeRecord
+from .geo import micro_region_at
+from .models import HeatCity, Param, RealtimeData, RealtimeRecord
 from .parsers import (
+    parse_avalanche_bulletin,
     parse_data_pie_page,
+    parse_earthquakes,
+    parse_heat_forecast,
+    parse_municipality_alerts,
     parse_pie_anag,
     parse_sensors,
     parse_series,
     parse_status,
 )
 from .urls import (
+    avalanche_bulletin_url,
     data_pie_url,
+    earthquakes_url,
+    heat_forecast_url,
+    municipality_alerts_url,
     pie_anag_url,
     sensors_url,
     series_url,
@@ -35,17 +49,26 @@ from .urls import (
 )
 
 if TYPE_CHECKING:
+    import datetime as dt
     from collections.abc import Callable
 
-    from .models import ParamSeries, RealtimeStation, Sensor
+    from .models import (
+        AvalancheBulletin,
+        Earthquake,
+        HeatForecast,
+        MunicipalityAlerts,
+        ParamSeries,
+        RealtimeStation,
+        Sensor,
+    )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ArpaPiemonteClient:
-    """Async client of the real-time data of the stations of Arpa Piemonte.
+    """Async client of the data of Arpa Piemonte: its stations and natural risks.
 
-    Two sources, for the same stations and readings:
+    Two sources for the same stations and readings:
 
     - the files of the Arpa website (:meth:`get_sensors`, :meth:`get_series`):
       hourly readings with their validation, about 40 minutes after the hour;
@@ -53,11 +76,17 @@ class ArpaPiemonteClient:
       :meth:`get_realtime_data`): every quantity of a station in one request,
       about 3 hours and 40 minutes after the hour.
 
+    The natural risks: the alerts of a municipality
+    (:meth:`get_municipality_alerts`), the earthquakes
+    (:meth:`get_earthquakes`), the heat waves (:meth:`get_heat_forecast`) and
+    the avalanche bulletins of EAWS (:meth:`get_avalanche_bulletin`, with
+    :meth:`get_micro_region`).
+
     Pass the ``aiohttp.ClientSession`` of the application (it is never closed
     by the client), or use the client as an async context manager to let it
-    manage its own session. The files of the website are asked whether they
-    changed since the last answer (``If-None-Match``, ``If-Modified-Since``):
-    when they did not, the client returns the object it returned before.
+    manage its own session. The files are asked whether they changed since
+    the last answer (``If-None-Match``, ``If-Modified-Since``): when they did
+    not, the client returns the object it returned before.
     """
 
     def __init__(
@@ -79,6 +108,12 @@ class ArpaPiemonteClient:
         self._user_agent = user_agent or _default_user_agent()
         self._sensors: ConditionalCache[tuple[Sensor, ...]] = ConditionalCache()
         self._series: ConditionalCache[ParamSeries] = ConditionalCache()
+        self._alerts: ConditionalCache[MunicipalityAlerts] = ConditionalCache()
+        self._earthquakes: ConditionalCache[tuple[Earthquake, ...]] = ConditionalCache()
+        self._heat: ConditionalCache[HeatForecast] = ConditionalCache()
+        self._avalanches: ConditionalCache[AvalancheBulletin] = ConditionalCache(
+            AVALANCHE_BULLETINS_KEPT
+        )
 
     async def __aenter__(self) -> Self:
         """Enter the async context."""
@@ -166,6 +201,69 @@ class ArpaPiemonteClient:
             station_code,
             tuple(sorted(records.values(), key=lambda record: record.time)),
         )
+
+    async def get_municipality_alerts(
+        self, municipality_code: str
+    ) -> MunicipalityAlerts:
+        """Return the alerts of a municipality, from its widget.
+
+        The level of each risk today and tomorrow, the danger now and the
+        operational phase the municipality declared. ``municipality_code`` is
+        its current ISTAT code ("096050"), as the api_realtime gives it
+        (``RealtimeStation.municipality_code``). Raises ``ValueError`` for a
+        code that is not 6 digits, :class:`ArpaPiemonteNotFoundError`,
+        :class:`ArpaPiemonteConnectionError` or
+        :class:`ArpaPiemonteParseError`.
+        """
+        return await self._get(
+            municipality_alerts_url(municipality_code),
+            partial(parse_municipality_alerts, municipality_code=municipality_code),
+            self._alerts,
+        )
+
+    async def get_earthquakes(self) -> tuple[Earthquake, ...]:
+        """Return the earthquakes of the last 30 days around Piedmont, newest first.
+
+        Raises :class:`ArpaPiemonteConnectionError` or
+        :class:`ArpaPiemonteParseError`.
+        """
+        return await self._get(earthquakes_url(), parse_earthquakes, self._earthquakes)
+
+    async def get_heat_forecast(self, city: HeatCity) -> HeatForecast:
+        """Return the heat-wave bulletin of a provincial capital.
+
+        Out of season, it is the last bulletin: compare its ``next_update``
+        with now. Raises :class:`ArpaPiemonteConnectionError` or
+        :class:`ArpaPiemonteParseError`.
+        """
+        city = HeatCity(city)
+        return await self._get(
+            heat_forecast_url(city),
+            partial(parse_heat_forecast, city=city),
+            self._heat,
+        )
+
+    async def get_avalanche_bulletin(self, day: dt.date) -> AvalancheBulletin:
+        """Return the avalanche bulletins of Piedmont for a day, by micro-region.
+
+        ``day`` is the day in Italy the bulletins are for: published at about
+        16:00 UTC the day before. Raises :class:`ArpaPiemonteNotFoundError`
+        when there is none for the day (out of season, from June to
+        November, or not published yet), :class:`ArpaPiemonteConnectionError`
+        or :class:`ArpaPiemonteParseError`.
+        """
+        return await self._get(
+            avalanche_bulletin_url(day), parse_avalanche_bulletin, self._avalanches
+        )
+
+    async def get_micro_region(self, latitude: float, longitude: float) -> str | None:
+        """Return the micro-region of the avalanche bulletins of a position.
+
+        None outside them: they cover the mountains of Piedmont. Reads the
+        micro-regions shipped with the package the first time, in a worker
+        thread.
+        """
+        return await asyncio.to_thread(micro_region_at, latitude, longitude)
 
     def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None:

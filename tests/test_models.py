@@ -2,33 +2,70 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 import pytest
 
 from aioarpapiemonte import (
+    AlertDay,
+    AlertLevel,
+    AvalancheDanger,
+    HeatCity,
+    HeatLevel,
     LevelStatus,
+    OperationalPhase,
     Param,
     Reading,
     RealtimeData,
     RealtimeField,
     RealtimeRecord,
+    RiskType,
     Thresholds,
     Validation,
     sensor_id,
 )
-from aioarpapiemonte.urls import data_pie_url, series_url
+from aioarpapiemonte.urls import (
+    avalanche_bulletin_url,
+    data_pie_url,
+    earthquakes_url,
+    heat_forecast_url,
+    municipality_alerts_url,
+    series_url,
+)
 
-from . import utc
+from . import PRAY_MUNICIPALITY, utc
 
-CODED: tuple[type[Param | RealtimeField | Validation | LevelStatus], ...] = (
+type Coded = (
+    Param
+    | RealtimeField
+    | RiskType
+    | HeatCity
+    | Validation
+    | LevelStatus
+    | AlertLevel
+    | AlertDay
+    | OperationalPhase
+    | HeatLevel
+    | AvalancheDanger
+)
+
+CODED: tuple[type[Coded], ...] = (
     Param,
     RealtimeField,
+    RiskType,
+    HeatCity,
     Validation,
     LevelStatus,
+    AlertLevel,
+    AlertDay,
+    OperationalPhase,
+    HeatLevel,
+    AvalancheDanger,
 )
 
 
 @pytest.mark.parametrize("enum", CODED)
-def test_codes(enum: type[Param | RealtimeField | Validation | LevelStatus]) -> None:
+def test_codes(enum: type[Coded]) -> None:
     """Test that codes are unique and give their value back."""
     codes = [member.code for member in enum]
 
@@ -132,3 +169,75 @@ def test_data_pie_url() -> None:
     )
     with pytest.raises(ValueError, match="Invalid station code"):
         data_pie_url("18 8")
+
+
+def test_alert_levels() -> None:
+    """Test that the levels compare, and alert from yellow."""
+    assert AlertLevel.RED > AlertLevel.ORANGE > AlertLevel.YELLOW > AlertLevel.GREEN
+    assert AlertLevel.GREEN > AlertLevel.NOT_EVALUATED > AlertLevel.UNKNOWN
+    assert [level for level in AlertLevel if level.is_alert] == [
+        AlertLevel.YELLOW,
+        AlertLevel.ORANGE,
+        AlertLevel.RED,
+    ]
+    assert str(AlertLevel.NOT_EVALUATED) == "not_evaluated"
+
+
+def test_heat_levels() -> None:
+    """Test the levels of discomfort as Arpa numbers them."""
+    assert [level.arpa_level for level in HeatLevel] == [None, 0, 1, 2, 3]
+    assert HeatLevel.of_arpa(0) is HeatLevel.GREEN
+    assert HeatLevel.of_arpa(None) is HeatLevel.UNKNOWN
+
+
+def test_avalanche_scale() -> None:
+    """Test the European scale of the avalanche danger."""
+    assert [danger.scale for danger in AvalancheDanger] == [None, None, 1, 2, 3, 4, 5]
+
+
+@pytest.mark.parametrize(
+    ("municipality", "city"),
+    [
+        (PRAY_MUNICIPALITY, HeatCity.BIELLA),
+        ("001272", HeatCity.TORINO),
+        ("103001", HeatCity.VERBANIA),
+        ("002105", HeatCity.VERCELLI),
+        ("018001", None),
+    ],
+)
+def test_capital_of(municipality: str, city: HeatCity | None) -> None:
+    """Test the capital of the province of a municipality; none in Pavia."""
+    assert HeatCity.capital_of(municipality) is city
+
+
+def test_heat_cities() -> None:
+    """Test that each city is the nearest to itself, and Pray nearest to Biella."""
+    assert all(
+        HeatCity.nearest(city.latitude, city.longitude) is city for city in HeatCity
+    )
+    assert HeatCity.nearest(45.6739, 8.22167) is HeatCity.BIELLA
+    assert HeatCity.NOVARA.municipality_code == "003106"
+    assert HeatCity.NOVARA.province_code == "003"
+
+
+def test_risk_urls() -> None:
+    """Test the URLs of the natural risks."""
+    assert municipality_alerts_url(PRAY_MUNICIPALITY) == (
+        "https://www.arpa.piemonte.it/rischi_naturali/widget/comuni/096050/index.json"
+    )
+    assert earthquakes_url().endswith(
+        "/rischi_naturali/data/sismica/sismica_tabella.json"
+    )
+    assert heat_forecast_url(HeatCity.TORINO).endswith(
+        "/widget/caldo/torino/index.json"
+    )
+    assert avalanche_bulletin_url(dt.date(2026, 4, 18)) == (
+        "https://static.avalanche.report/eaws_bulletins/2026-04-18/2026-04-18-IT-21.json"
+    )
+
+
+@pytest.mark.parametrize("code", ["96050", "0960500", "../096050", "ABCDEF"])
+def test_invalid_municipality_code(code: str) -> None:
+    """Test that a municipality code that is not 6 digits is refused."""
+    with pytest.raises(ValueError, match="Invalid municipality code"):
+        municipality_alerts_url(code)

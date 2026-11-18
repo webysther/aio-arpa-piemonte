@@ -6,8 +6,10 @@ Guidance for AI coding agents and contributors working on this repository.
 aioarpapiemonte is an async Python client (asyncio, aiohttp) for the official
 real-time data of the stations of Arpa Piemonte: the files of the Arpa
 website (hourly, with validation) and the api_realtime (documented, a few
-hours later). It is fully typed, has no Home Assistant dependency and is
-published to PyPI.
+hours later). It also reads the natural risks: the widgets of the website
+(the alerts of a municipality, the heat waves), its list of earthquakes, and
+the avalanche bulletins of AINEVA through EAWS. It is fully typed, has no Home
+Assistant dependency and is published to PyPI.
 
 Its main user is the Home Assistant integration ARPA Piemonte
 (`arpa_piemonte`), which pins an exact version and reads these sources when
@@ -35,19 +37,24 @@ Assistant code and the fallback belong in the integration.
 src/aioarpapiemonte/
   client.py      ArpaPiemonteClient: get_sensors(), get_series() (website);
                  get_realtime_stations(), get_realtime_data(),
-                 get_realtime_status() (api_realtime)
+                 get_realtime_status() (api_realtime);
+                 get_municipality_alerts(), get_earthquakes(),
+                 get_heat_forecast() (website); get_avalanche_bulletin()
+                 (EAWS), get_micro_region()
   _http.py       ConditionalCache: the latest answer of each URL, with its
                  validators
   parsers.py     pure parsing of the decoded JSON, without I/O
   models.py      frozen dataclasses and enums; exceptions.py
+  geo.py         distances, and the avalanche micro-regions of EAWS shipped
+                 in data/ (read once, in a worker thread by the client)
   urls.py        URL builders and sensor_id(), the identifier of a station on
                  the website; const.py
 tests/           pytest; tests/server.py is a local HTTPS server standing in
-                 for the hosts of Arpa, answering 304 to conditional requests
+                 for the hosts of Arpa and EAWS, answering 304 to conditional
+                 requests
 docs/            arpa-data.md: the station files of the website and the
                  api_realtime; arpa-risk-products.md: alerts, floods,
-                 landslides, avalanches and the other risk products, not
-                 read by the library yet
+                 landslides, avalanches and the other risk products
 ```
 
 The public API is what `aioarpapiemonte/__init__.py` exports in `__all__`,
@@ -72,8 +79,11 @@ coverage gate is 95% with branches; keep it at 100%.
 
 - Never reach Arpa Piemonte: `tests/server.py` answers for its hosts over
   HTTPS (certificates from trustme).
-- `tests/fixtures/real` holds unmodified files of Arpa Piemonte that guard
-  the format: never edit them. Hand-made data is built in the tests.
+- `tests/fixtures/real` holds unmodified files of Arpa Piemonte and EAWS
+  that guard the format: never edit them. Hand-made data is built in the
+  tests.
+- `src/aioarpapiemonte/data` holds the micro-regions of EAWS in use, as EAWS
+  publishes them (see `geo.py`): take them again from EAWS, never edit them.
 - Never depend on the current date or time zone of the machine.
 
 ## Arpa Piemonte data
@@ -100,6 +110,20 @@ Facts that are easy to get wrong (measured on 2026-11-17, see the README):
   a value.
 - `sensors.geojson` is 617 KB, uncompressed, and its ETag changes every
   cycle: read it to choose a station, not at every update.
+
+Facts of the natural risks (measured on 2026-11-17 and 18):
+
+- The alert bulletin is issued around 13:00 for that day and the next: until
+  then, `day_0` of the widget is yesterday. Read the levels by date
+  (`MunicipalityAlerts.level_on`).
+- The widget uses the current ISTAT code of the municipality, as the
+  api_realtime does; never the one inside the identifier of a station.
+- The widgets ask to keep their layout (`nota_implementazione_widget`).
+- The heat-wave widgets keep the last bulletin out of season; the avalanche
+  bulletins of a day answer 404 out of season.
+- The names of the micro-regions in the bulletins of EAWS are those before
+  2022-03-04, numbered otherwise: the names come from EAWS
+  (`MICRO_REGION_NAMES`), the bulletins give only the identifiers.
 
 ## Versioning and releases
 

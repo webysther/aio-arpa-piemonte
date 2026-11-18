@@ -5,16 +5,20 @@ build-backend = "hatchling.build"
 [project]
 name = "aioarpapiemonte"
 dynamic = ["version"]
-description = "Async client for the real-time data of the stations of Arpa Piemonte: river levels, rain, temperature and snow, from its website files and its api_realtime"
+description = "Async client for the data of Arpa Piemonte: river levels, rain, temperature and snow of its stations, alerts, earthquakes, heat waves and avalanche bulletins"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Webysther Sperandio" }]
 requires-python = ">=3.13"
 keywords = [
+  "allerta",
   "api_realtime",
   "arpa piemonte",
   "asyncio",
+  "avalanche",
+  "earthquake",
+  "heat wave",
   "hydrometer",
   "idrometro",
   "italy",

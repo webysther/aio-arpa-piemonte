@@ -19,6 +19,7 @@ class ArpaPiemonteNotFoundError(ArpaPiemonteError):
     """The file does not exist (HTTP 404).
 
     A station does not publish every quantity it has a sensor for: the wind
-    speed of a station can be ``vels`` instead of ``velv``. Retrying does not
+    speed of a station can be ``vels`` instead of ``velv``. An avalanche
+    bulletin does not exist out of season. Retrying the same request does not
     help.
     """

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import json
 from typing import TYPE_CHECKING
 
@@ -11,23 +12,29 @@ import pytest
 
 from aioarpapiemonte import (
     MAX_PAGES,
+    AlertLevel,
     ArpaPiemonteClient,
     ArpaPiemonteConnectionError,
     ArpaPiemonteNotFoundError,
     ArpaPiemonteParseError,
+    HeatCity,
     Param,
     RealtimeField,
     __version__,
 )
 from aioarpapiemonte.urls import (
+    avalanche_bulletin_url,
     data_pie_url,
+    earthquakes_url,
+    heat_forecast_url,
+    municipality_alerts_url,
     pie_anag_url,
     sensors_url,
     series_url,
     status_url,
 )
 
-from . import PRAY, PRAY_SENSOR, real_bytes, utc
+from . import PRAY, PRAY_MUNICIPALITY, PRAY_SENSOR, real_bytes, utc
 
 if TYPE_CHECKING:
     from .server import FakeArpa
@@ -35,6 +42,8 @@ if TYPE_CHECKING:
 LEVEL_URL = series_url(Param.LEVEL, PRAY_SENSOR)
 ETAG = '"4495-6606edcc552f8"'
 LAST_MODIFIED = "Tue, 17 Nov 2026 01:32:06 GMT"
+AVALANCHE_DAY = dt.date(2026, 4, 18)
+"""The day of the real avalanche bulletins."""
 
 
 def page(page_number: int, total_pages: int, *hours: int) -> bytes:
@@ -236,6 +245,82 @@ async def test_cancellation_propagates(
         await task
 
 
+async def test_municipality_alerts(client: ArpaPiemonteClient, arpa: FakeArpa) -> None:
+    """Test the alerts of a municipality, asked whether they changed."""
+    arpa.add(
+        municipality_alerts_url(PRAY_MUNICIPALITY),
+        body=real_bytes("widget_096050.json"),
+        etag='"9d4-66086a263fa3a"',
+        last_modified="Wed, 18 Nov 2026 05:53:46 GMT",
+    )
+
+    alerts = await client.get_municipality_alerts(PRAY_MUNICIPALITY)
+
+    assert alerts.alert is AlertLevel.GREEN
+    assert await client.get_municipality_alerts(PRAY_MUNICIPALITY) is alerts
+    assert arpa.requests[1].headers["If-None-Match"] == '"9d4-66086a263fa3a"'
+
+
+async def test_earthquakes(client: ArpaPiemonteClient, arpa: FakeArpa) -> None:
+    """Test the earthquakes of the last 30 days."""
+    arpa.add(earthquakes_url(), body=real_bytes("sismica_tabella.json"))
+
+    assert len(await client.get_earthquakes()) == 28
+
+
+async def test_heat_forecast(client: ArpaPiemonteClient, arpa: FakeArpa) -> None:
+    """Test the heat-wave bulletin of a city."""
+    arpa.add(heat_forecast_url(HeatCity.TORINO), body=real_bytes("caldo_torino.json"))
+
+    forecast = await client.get_heat_forecast(HeatCity.TORINO)
+
+    assert forecast.city is HeatCity.TORINO
+    assert len(forecast.days) == 3
+
+
+async def test_avalanche_bulletin(client: ArpaPiemonteClient, arpa: FakeArpa) -> None:
+    """Test the avalanche bulletins of a day, and none out of season."""
+    arpa.add(
+        avalanche_bulletin_url(AVALANCHE_DAY),
+        body=real_bytes("2026-04-18-IT-21.json"),
+    )
+
+    bulletin = await client.get_avalanche_bulletin(AVALANCHE_DAY)
+
+    assert len(bulletin.regions) == 14
+    assert arpa.requests[0].url.startswith("https://static.avalanche.report/")
+    with pytest.raises(ArpaPiemonteNotFoundError):
+        await client.get_avalanche_bulletin(dt.date(2026, 11, 18))
+
+
+async def test_past_avalanche_bulletins_are_not_kept(
+    client: ArpaPiemonteClient, arpa: FakeArpa
+) -> None:
+    """Test that only the bulletins of the 2 latest days asked are kept."""
+    days = [AVALANCHE_DAY - dt.timedelta(days=number) for number in (2, 1, 0)]
+    for day in days:
+        arpa.add(
+            avalanche_bulletin_url(day),
+            body=real_bytes("2026-04-18-IT-21.json"),
+            etag=f'"{day}"',
+        )
+    for day in days:
+        await client.get_avalanche_bulletin(day)
+
+    await client.get_avalanche_bulletin(days[0])
+    await client.get_avalanche_bulletin(days[2])
+
+    assert "If-None-Match" not in arpa.requests[3].headers
+    assert arpa.requests[4].headers["If-None-Match"] == f'"{days[2]}"'
+
+
+async def test_micro_region(client: ArpaPiemonteClient, arpa: FakeArpa) -> None:
+    """Test the micro-region of a position, without any request."""
+    assert await client.get_micro_region(45.0786, 6.7036) == "IT-21-TO-03"
+    assert await client.get_micro_region(45.0703, 7.6869) is None
+    assert arpa.requests == []
+
+
 async def test_invalid_identifiers_are_checked_before_any_request(
     client: ArpaPiemonteClient, arpa: FakeArpa
 ) -> None:
@@ -244,6 +329,8 @@ async def test_invalid_identifiers_are_checked_before_any_request(
         await client.get_series(Param.LEVEL, "188")
     with pytest.raises(ValueError, match="Invalid station code"):
         await client.get_realtime_data("../188")
+    with pytest.raises(ValueError, match="Invalid municipality code"):
+        await client.get_municipality_alerts("96050")
 
     assert arpa.requests == []
 

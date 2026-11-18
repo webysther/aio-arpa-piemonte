@@ -21,9 +21,10 @@ class ConditionalCache[T]:
     and answer 304 when asked with either (measured on 2026-11-17).
     """
 
-    def __init__(self) -> None:
-        """Initialize an empty cache."""
+    def __init__(self, limit: int | None = None) -> None:
+        """Initialize an empty cache, of at most ``limit`` URLs (the latest)."""
         self._entries: dict[str, _Entry[T]] = {}
+        self._limit = limit
 
     def validators(self, url: str) -> dict[str, str]:
         """Return the headers that ask the host whether the URL changed."""
@@ -46,7 +47,9 @@ class ConditionalCache[T]:
         self, url: str, value: T, *, etag: str | None, last_modified: str | None
     ) -> None:
         """Keep a parsed answer; without validators there is nothing to ask with."""
+        self._entries.pop(url, None)
         if etag is None and last_modified is None:
-            self._entries.pop(url, None)
             return
         self._entries[url] = _Entry(etag, last_modified, value)
+        if self._limit is not None and len(self._entries) > self._limit:
+            del self._entries[next(iter(self._entries))]

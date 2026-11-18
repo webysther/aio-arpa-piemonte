@@ -1,4 +1,4 @@
-"""Local HTTPS server standing in for the hosts of Arpa Piemonte.
+"""Local HTTPS server standing in for the hosts of Arpa Piemonte and EAWS.
 
 A fake DNS resolver sends the hosts to a local aiohttp test server whose
 certificate is issued by a test CA, so the client runs unchanged against real
@@ -22,7 +22,7 @@ from multidict import CIMultiDictProxy
 if TYPE_CHECKING:
     import trustme
 
-HOSTS = ("www.arpa.piemonte.it", "utility.arpa.piemonte.it")
+HOSTS = ("www.arpa.piemonte.it", "utility.arpa.piemonte.it", "static.avalanche.report")
 
 
 @dataclass(frozen=True, slots=True)

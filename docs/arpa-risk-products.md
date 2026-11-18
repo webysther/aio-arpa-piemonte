@@ -4,11 +4,13 @@ What Arpa Piemonte publishes beyond the readings of the stations: the alert
 bulletin, the per-municipality widget, current danger, vigilance, flood
 forecasts, landslide scenarios, snow and avalanches, heat waves, fire danger
 and earthquakes, plus the APIs, open data and national sources around them.
-None of it is in aioarpapiemonte yet (0.1.0). It was studied for the
+It was studied for the
 [ARPA Piemonte](https://github.com/webysther/ha-arpa-piemonte) integration, to offer what the
-DPC integration offers, for Piedmont, from the regional source.
+DPC integration offers, for Piedmont, from the regional source. Since 0.2.0,
+aioarpapiemonte reads the widget of a municipality, the earthquakes, the heat
+waves and the avalanche bulletins of EAWS.
 
-Measured on 2026-11-16 and 17. The numbers are measurements of those days:
+Measured on 2026-11-16 and 17, some again on 18. The numbers are measurements of those days:
 measure again, politely, before relying on one. Anything not confirmed is
 marked **Unverified**.
 
@@ -27,7 +29,8 @@ refused connections after a few quick requests.
 
 - **Headers:** Apache sends ETag and Last-Modified, no Cache-Control, and
   `Vary: Accept-Encoding`.
-  - **Unverified:** a `304` on these products.
+  - A conditional request answers `304`, with either validator (the widget
+    of Pray, 2026-11-18).
 - **CORS:** `Access-Control-Allow-Methods: *` but no
   `Access-Control-Allow-Origin`. Server-side Python can read the files; a
   browser cannot.
@@ -43,7 +46,8 @@ refused connections after a few quick requests.
 - **Licence:** `/note-legali` puts the site content and open data under CC
   BY 4.0, credited as "Fonte: Arpa Piemonte - www.arpa.piemonte.it". The
   widget JSON also asks to keep Arpa's widget layout, unless only the bell
-  icon is used.
+  icon is used; the heat-wave widget asks to keep its layout, without that
+  exception.
 - **PDFs:**
   - current bulletins: `/rischi_naturali/boll/bollettino_{allerta,vigilanza,piene,frane,aggiornamento,calore,calore_comune_torino,incendi}.pdf`;
   - archive: `/boll/archivio_bollettini/{kind}/bollettino_YYYY-MM-DD[_HH].pdf`;
@@ -244,8 +248,11 @@ Source: `/snippets_arpa/frane/`.
   date to detect stale data.
 - **Richer snippet:** `/snippets_arpa/caldo_regione/` has more data, with
   opaque keys; Torino adds `COD_SALUTE`.
-- **Unverified:** the JSON of the 7 cities other than Torino was not
-  fetched.
+- **The 8 cities, fetched on 2026-11-18:** each file has the days under the
+  name of its city in capitals (`TORINO`, `VERBANIA`...), 3 days, `note`
+  empty and `emissione` 2026-09-30, the last bulletin of the season. The
+  numbers are texts ("26"), and the detail of a level is
+  `livello_disagio_dettalio` (sic).
 
 ### Fire danger
 
@@ -269,7 +276,14 @@ Source: `/rischi_naturali/data/sismica/sismica_tabella.json`.
   `tempo_origine`, `time_elab` and `time_upd`.
 - **Coverage:** the last 30 days, 6–10°E × 43.5–47°N. ML ≥ 1.0 events appear
   after review; ML ≥ 2.5 appear automatically within minutes.
-- **Unverified:** the time zone of `time_upd`.
+- **Times:** `Data e ora (UTC)` and `tempo_origine` are "2026-11-17
+  06:42:50"; `time_upd` is "2026-11-17, 08:22:09", with a comma, about an
+  hour after `time_elab`: local time, probably. aioarpapiemonte reads only
+  the time of the event.
+- **On 2026-11-18:** 28 events, all ML and `dati_elaborati` "rivisti", the
+  newest first.
+- **Unverified:** the time zone of `time_upd`, and the `dati_elaborati` of an
+  automatic event.
 
 ### Municipality → alert zone
 
@@ -415,7 +429,17 @@ few quick requests: **throttle that host**.
     the Piedmont polygon.
 - **Avalanches, EAWS:**
   - Bulletin: `https://static.avalanche.report/eaws_bulletins/{date}/{date}-IT-21.json`
-    (CAAMLv6, provider "AINEVA Piemonte"). CORS `*`, ETag and Last-Modified.
+    (CAAMLv6, provider "AINEVA Piemonte"). CORS `*`, ETag and Last-Modified;
+    `304` to `If-None-Match` (2026-11-18). The texts are in English
+    (`lang` "en").
+  - **The names of the bulletin are stale:** the bulletin of 2026-04-18
+    names its micro-regions as before 2022-03-04, when they were numbered
+    otherwise ("IT-21-TO-03": "Alpi Graie", now IT-21-TO-04), and names
+    IT-21-TO-05, new, by its identifier. Its identifiers are the current
+    ones: it has the 14 of them. The current names are in
+    `https://regions.avalanches.org/micro-regions_names/it.json`
+    (IT-21-TO-03 "Alte Valli Susa e Chisone", with Bardonecchia and
+    Sestriere, checked with shapely).
     Seasonal: 404 on 2026-11-17. Sample from 2026-04-18:
     `dangerRatings:[{"mainValue":"moderate","elevation":{"lowerBound":"2600"},"validTimePeriod":"earlier"}]`.
   - Micro-regions: `https://regions.avalanches.org/micro-regions/IT-21_micro-regions.geojson.json`,
@@ -466,15 +490,14 @@ few quick requests: **throttle that host**.
 
 ## Still unverified
 
-- A `304` answer on the risk products (they send ETag and Last-Modified).
 - The cadence of the current danger (about 10 minutes from the widget, not
   confirmed on `mappa_pericolo`).
 - The meaning of vigilance `vig_2..4` (only `vig_0` and `vig_1` were seen)
   and the values of landslide `PROBABILITA` other than "nessuna".
 - The names of the fire danger levels 1–5 (the legend is outlined text).
-- The heat-wave JSON of the 7 cities other than Torino.
-- The time zone of `time_upd` in `sismica_tabella.json`.
-- AINEVA: the licence and caching headers; which host carries the IT-21
+- The time zone of `time_upd` in `sismica_tabella.json`, and the
+  `dati_elaborati` of an automatic earthquake.
+- AINEVA: the licence of the bulletins; which host carries the IT-21
   CAAML in season (`bollettini.aineva.it/albina_files` or
   `static.avalanche.report/eaws_bulletins`); whether the 14 EAWS
   micro-regions match Arpa's 14 snow sectors.

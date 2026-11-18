@@ -6,10 +6,19 @@ import re
 from typing import TYPE_CHECKING, Final
 from urllib.parse import urlencode
 
-from .const import DATA_PIE_PAGE_SIZE, GEOJSON_BASE_URL, REALTIME_BASE_URL
+from .const import (
+    DATA_PIE_PAGE_SIZE,
+    EAWS_BULLETINS_URL,
+    GEOJSON_BASE_URL,
+    PIEMONTE_EAWS_REGION,
+    REALTIME_BASE_URL,
+    RISKS_BASE_URL,
+)
 
 if TYPE_CHECKING:
-    from .models import Param
+    import datetime as dt
+
+    from .models import HeatCity, Param
 
 _SENSOR_ID: Final = re.compile(r"\d{9}")
 """An identifier of a station on the Arpa website: 9 digits."""
@@ -80,3 +89,32 @@ def data_pie_url(station_code: str, page: int = 1) -> str:
         {"station_code": station_code, "page_size": DATA_PIE_PAGE_SIZE, "page": page}
     )
     return f"{REALTIME_BASE_URL}data_pie?{query}"
+
+
+def municipality_alerts_url(municipality_code: str) -> str:
+    """Return the URL of the widget of the alerts of a municipality.
+
+    ``municipality_code`` is its current ISTAT code ("096050"). Raises
+    ``ValueError`` when it is not 6 digits.
+    """
+    if not _MUNICIPALITY_CODE.fullmatch(municipality_code):
+        msg = f"Invalid municipality code: {municipality_code!r}"
+        raise ValueError(msg)
+    return f"{RISKS_BASE_URL}widget/comuni/{municipality_code}/index.json"
+
+
+def earthquakes_url() -> str:
+    """Return the URL of the earthquakes of the last 30 days."""
+    return f"{RISKS_BASE_URL}data/sismica/sismica_tabella.json"
+
+
+def heat_forecast_url(city: HeatCity) -> str:
+    """Return the URL of the widget of the heat-wave bulletin of a city."""
+    return f"{RISKS_BASE_URL}widget/caldo/{city.value}/index.json"
+
+
+def avalanche_bulletin_url(day: dt.date) -> str:
+    """Return the URL of the avalanche bulletins of Piedmont for a day."""
+    return (
+        f"{EAWS_BULLETINS_URL}{day:%Y-%m-%d}/{day:%Y-%m-%d}-{PIEMONTE_EAWS_REGION}.json"
+    )
